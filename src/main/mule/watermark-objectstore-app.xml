@@ -10,9 +10,6 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 	<db:config name="Database_Config" doc:name="Database Config" doc:id="1d7ec3be-3234-4cde-8261-1411435660d3" >
 		<db:my-sql-connection host="localhost" port="3306" user="root" password="Krishna.2" database="watermark" />
 	</db:config>
-	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="0497b4e3-cca2-45fe-be9a-1912d29f08a9" >
-		<http:listener-connection host="0.0.0.0" port="8081" />
-	</http:listener-config>
 	<flow name="watermark-automatic" doc:id="16d37934-7434-4de6-afd7-9b777166ca48" >
 		<db:listener table="persons" doc:name="table-trigger" doc:id="c42bb154-2ebe-4058-bbbc-dceffee5d821" config-ref="Database_Config" watermarkColumn="PersonID" idColumn="PersonID">
 			<scheduling-strategy >

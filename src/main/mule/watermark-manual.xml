@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config2" doc:name="HTTP Listener config" doc:id="0b47c6c9-db11-4f69-8fa0-f861b810d3bb" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<flow name="watermark-manualFlow" doc:id="931df813-3fdb-4b89-a52b-775e00ca427d" >
+		<http:listener doc:name="Listener" doc:id="8606995a-b25b-4dfb-b4b1-c064ed9ff741" config-ref="HTTP_Listener_config2" path="/watermarkmanual"/>
+		<os:retrieve doc:name="Retrieve" doc:id="a3538c48-5f0a-4bec-b4be-a0f86193336a" key="maxId" target="maxId">
+			<os:default-value ><![CDATA[1]]></os:default-value>
+		</os:retrieve>
+		<db:select doc:name="Select" doc:id="d58da3ac-ba4c-42b1-be46-e461ebe1b81d" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from persons where PersonId > :maxId]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	maxId: vars.maxId default 0
+}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="fe31ca57-6c7d-46e1-99a5-1725397f2ebc" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map {
+	PersonID: $.PersonID,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	Address: $.Address,
+	City:  $.City,
+	State: $.State
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="eaba1a17-eb37-4cdd-884b-36ea4a3ee497" message="#[payload]"/>
+		<choice doc:name="Choice" doc:id="b5ea603f-d9c5-47b6-80f3-fb10a89cbb7a" >
+			<when expression="#[not isEmpty(payload)]">
+				<foreach doc:name="For Each" doc:id="2af9d936-498d-403a-b530-27aaf27e5372" batchSize="200">
+					<logger level="INFO" doc:name="Logger" doc:id="79bd4e98-d0c5-40af-90c5-534dd44b9c37" message="#[payload]"/>
+					<db:bulk-insert doc:name="Bulk insert" doc:id="fd41ceec-5cc9-47a7-90cc-5b17c9a2d098" config-ref="Database_Config">
+						<db:bulk-input-parameters ><![CDATA[#[%dw 2.0
+output application/json
+---
+payload map {
+	PersionID: $.PersonID,
+	LastName: $.LastName,
+	FirstName: $.FirstName,
+	Address: $.Address,
+	City:  $.City,
+	State: $.State
+}]]]></db:bulk-input-parameters>
+						<db:sql ><![CDATA[insert into Humans1 values (:PersionID, :LastName, :FirstName, :Address, :City, :State)
+]]></db:sql>
+					</db:bulk-insert>
+				</foreach>
+				<os:store doc:name="Store" doc:id="513a0fbb-3d9d-49ea-a55c-60031266f960" key="maxId">
+						<os:value><![CDATA[#[max(payload.PersonID default [vars.maxId])]]]></os:value>
+					</os:store>
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name='"No new records"' doc:id="24a6c224-d2ec-4cd7-ae57-ecab05546847" message='#["No new records"]'/>
+			</otherwise>
+		</choice>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="14fd3234-05d2-4db2-970f-423bf1ff7ff0" />
+	</flow>
+</mule>
